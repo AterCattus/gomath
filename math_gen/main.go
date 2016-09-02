@@ -22,7 +22,7 @@ var (
 		`int`, `int8`, `int16`, `int32`, `int64`,
 	}
 
-	commonTypes = []string{
+	floatTypes = []string{
 		`float32`, `float64`,
 	}
 
@@ -36,10 +36,13 @@ var (
 
 var (
 	argv struct {
-		tmplIntFile    string
-		tmplCommonFile string
-		tmplSignedFile string
-		outFile        string
+		tmplCommonFile      string
+		tmplIntFile         string
+		tmplIntSignedFile   string
+		tmplIntUnsignedFile string
+		tmplSignedFile      string
+		tmplFloatFile       string
+		outFile             string
 	}
 )
 
@@ -49,9 +52,12 @@ type (
 )
 
 func init() {
-	flag.StringVar(&argv.tmplIntFile, `tmpl_int`, `/dev/stdin`, `Input template file (for int types)`)
 	flag.StringVar(&argv.tmplCommonFile, `tmpl_common`, `/dev/stdin`, `Input template file (for all types)`)
+	flag.StringVar(&argv.tmplIntFile, `tmpl_int`, `/dev/stdin`, `Input template file (for int types)`)
+	flag.StringVar(&argv.tmplIntSignedFile, `tmpl_int_signed`, `/dev/stdin`, `Input template file (for signed int types)`)
+	flag.StringVar(&argv.tmplIntUnsignedFile, `tmpl_int_unsigned`, `/dev/stdin`, `Input template file (for unsigned int types)`)
 	flag.StringVar(&argv.tmplSignedFile, `tmpl_signed`, `/dev/stdin`, `Input template file (for signed types)`)
+	flag.StringVar(&argv.tmplFloatFile, `tmpl_float`, `/dev/stdin`, `Input template file (for float types)`)
 	flag.StringVar(&argv.outFile, `o`, `/dev/stdout`, `Output generated code file`)
 }
 
@@ -60,17 +66,16 @@ func main() {
 	log.SetFlags(log.Lmicroseconds | log.Ldate | log.Lshortfile)
 
 	flag.Parse()
-	if len(argv.tmplIntFile) == 0 ||
+	if len(argv.tmplIntSignedFile) == 0 ||
 		len(argv.tmplCommonFile) == 0 ||
+		len(argv.tmplIntFile) == 0 ||
+		len(argv.tmplIntSignedFile) == 0 ||
+		len(argv.tmplIntUnsignedFile) == 0 ||
 		len(argv.tmplSignedFile) == 0 ||
+		len(argv.tmplFloatFile) == 0 ||
 		len(argv.outFile) == 0 {
 		flag.Usage()
 		os.Exit(1)
-	}
-
-	tmplInt, err := loadTemplate(argv.tmplIntFile)
-	if err != nil {
-		log.Fatalln(err.Error())
 	}
 
 	tmplCommon, err := loadTemplate(argv.tmplCommonFile)
@@ -78,7 +83,27 @@ func main() {
 		log.Fatalln(err.Error())
 	}
 
+	tmplInt, err := loadTemplate(argv.tmplIntFile)
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
+
+	tmplIntSigned, err := loadTemplate(argv.tmplIntSignedFile)
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
+
+	tmplIntUnsigned, err := loadTemplate(argv.tmplIntUnsignedFile)
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
+
 	tmplSigned, err := loadTemplate(argv.tmplSignedFile)
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
+
+	tmplFloat, err := loadTemplate(argv.tmplFloatFile)
 	if err != nil {
 		log.Fatalln(err.Error())
 	}
@@ -96,16 +121,20 @@ func main() {
 	for _, type_ := range signedIntTypes {
 		genForType(tmplCommon, []byte(type_), &buf)
 		genForType(tmplInt, []byte(type_), &buf)
+		genForType(tmplIntSigned, []byte(type_), &buf)
 		genForType(tmplSigned, []byte(type_), &buf)
 	}
 
 	for _, type_ := range unsignedIntTypes {
 		genForType(tmplCommon, []byte(type_), &buf)
 		genForType(tmplInt, []byte(type_), &buf)
+		genForType(tmplIntUnsigned, []byte(type_), &buf)
 	}
 
-	for _, type_ := range commonTypes {
+	for _, type_ := range floatTypes {
 		genForType(tmplCommon, []byte(type_), &buf)
+		genForType(tmplSigned, []byte(type_), &buf)
+		genForType(tmplFloat, []byte(type_), &buf)
 	}
 
 	if buf, err := format.Source(buf.Bytes()); err != nil {
