@@ -15,7 +15,11 @@ var (
 	intTypes = []string{
 		`int`, `int8`, `int16`, `int32`, `int64`,
 		`uint`, `uint8`, `uint16`, `uint32`, `uint64`,
-		`byte`, `float32`, `float64`,
+		`byte`,
+	}
+
+	commonTypes = []string{
+		`float32`, `float64`,
 	}
 
 	genHeader = []byte(`package gomath
@@ -27,8 +31,9 @@ var (
 
 var (
 	argv struct {
-		inFile  string
-		outFile string
+		tmplIntFile    string
+		tmplCommonFile string
+		outFile        string
 	}
 )
 
@@ -38,7 +43,8 @@ type (
 )
 
 func init() {
-	flag.StringVar(&argv.inFile, `i`, `/dev/stdin`, `Input template file`)
+	flag.StringVar(&argv.tmplIntFile, `tmpl_int`, `/dev/stdin`, `Input template file (for int types)`)
+	flag.StringVar(&argv.tmplCommonFile, `tmpl_common`, `/dev/stdin`, `Input template file (for all types)`)
 	flag.StringVar(&argv.outFile, `o`, `/dev/stdout`, `Output generated code file`)
 }
 
@@ -47,17 +53,22 @@ func main() {
 	log.SetFlags(log.Lmicroseconds | log.Ldate | log.Lshortfile)
 
 	flag.Parse()
-	if len(argv.inFile) == 0 || len(argv.outFile) == 0 {
+	if len(argv.tmplIntFile) == 0 || len(argv.tmplCommonFile) == 0 || len(argv.outFile) == 0 {
 		flag.Usage()
 		os.Exit(1)
 	}
 
-	tmpl, err := ioutil.ReadFile(argv.inFile)
+	tmplInt, err := ioutil.ReadFile(argv.tmplIntFile)
 	if err != nil {
 		log.Fatalln(`Cannot read from input file: ` + err.Error())
 	}
+	tmplInt = tmplInt[len("package main\n"):]
 
-	tmpl = tmpl[len("package main\n"):]
+	tmplCommon, err := ioutil.ReadFile(argv.tmplCommonFile)
+	if err != nil {
+		log.Fatalln(`Cannot read from input file: ` + err.Error())
+	}
+	tmplCommon = tmplCommon[len("package main\n"):]
 
 	outFile, err := os.Create(argv.outFile)
 	if err != nil {
@@ -70,7 +81,12 @@ func main() {
 	buf.Write(genHeader)
 
 	for _, type_ := range intTypes {
-		genForType(tmpl, []byte(type_), &buf)
+		genForType(tmplCommon, []byte(type_), &buf)
+		genForType(tmplInt, []byte(type_), &buf)
+	}
+
+	for _, type_ := range commonTypes {
+		genForType(tmplCommon, []byte(type_), &buf)
 	}
 
 	if buf, err := format.Source(buf.Bytes()); err != nil {
